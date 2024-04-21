@@ -4,6 +4,7 @@
 import random
 import threading
 import webbrowser
+import markdown
 
 from flask import Flask, request, render_template_string
 # Imports
@@ -30,7 +31,7 @@ model_path = "Model/mistral-7b-openorca.Q4_K_M.gguf"
 model_kwargs = {
     "n_ctx": 4096,  # Context length to use
     "n_threads": 6,  # Number of CPU threads to use
-    "n_gpu_layers": 0,  # Number of model layers to offload to GPU. Set to 0 if only using CPU
+    "n_gpu_layers": 512,  # Number of model layers to offload to GPU. Set to 0 if only using CPU
 }
 
 # Instantiate model from downloaded file
@@ -41,7 +42,7 @@ generation_kwargs = {
     "max_tokens": 256,  # Max number of new tokens to generate
     "stop": ["<|endoftext|>", "</s>"],  # Text sequences to stop generation on
     "echo": False,  # Echo the prompt in the output
-    "top_k": 5
+    "top_k": 10
     # This is essentially greedy decoding, since the model will always return the highest-probability token. Set this
     # value > 1 for sampling decoding
 }
@@ -86,20 +87,26 @@ def index():
 def submit():
     # Get the message from the submitted form
     message = request.form['message']
-    prompt = f"{message}"
+    custom_instructions = f"You are a helpful AI assistant which will summarize this message: "
+    prompt = f"{custom_instructions} {message}"
 
     # Generate response using llm
     res = llm(prompt, **generation_kwargs)
 
+    final_response = res["choices"][0]["text"]
+
+    # Remove the instructions from final output
+    final_response = final_response.replace(custom_instructions, '')
+
     # Render the form again, along with the response and prompt
-    return render_template_string(HTML_TEMPLATE, prompt=prompt, response=res["choices"][0]["text"])
+    return render_template_string(HTML_TEMPLATE, prompt=message, response=final_response)
 
 
 if __name__ == '__main__':
-    port = 5000 + random.randint(0, 999)
-    url = "http://127.0.0.1:{0}".format(port)
-    threading.Timer(1.25, lambda: webbrowser.open(url) ).start()
-    app.run(port=port, debug=False)
+    port = 5000 + random.randint(0, 999)  # Get random port
+    url = "http://127.0.0.1:{0}".format(port)  # Create link
+    threading.Timer(1.25, lambda: webbrowser.open(url)).start()  # Open link in web browser
+    app.run(port=port, debug=False)  # Run the flask server
 
 """
 # Start an infinite loop to continuously prompt for user input
